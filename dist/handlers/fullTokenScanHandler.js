@@ -26,7 +26,7 @@ const fullTokenScanHandler = (ctx) => __awaiter(void 0, void 0, void 0, function
         const data = response.data;
         // Check if the response data is valid
         if (!data.symbol) {
-            ctx.reply('Token not found. Please check the symbol and try again.');
+            yield ctx.reply('Token not found. Please check the symbol and try again.');
             return;
         }
         // Parse and format the response data

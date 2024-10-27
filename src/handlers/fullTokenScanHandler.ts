@@ -15,7 +15,7 @@ export const fullTokenScanHandler = async (ctx: Context) => {
 
         // Check if the response data is valid
         if (!data.symbol) {
-            ctx.reply('Token not found. Please check the symbol and try again.');
+            await ctx.reply('Token not found. Please check the symbol and try again.');
             return;
         }
 
