@@ -1,4 +1,5 @@
 import { Context } from "telegraf";
+import { addTokenCount } from "../utils/addTokenCount";
 
 export const pfQueryHandler = async (ctx: Context) => {
   const token = ctx.text?.split(" ")[1];
@@ -7,10 +8,14 @@ export const pfQueryHandler = async (ctx: Context) => {
     await ctx.reply("Please provide a token symbol to query.");
     return;
   }
-
+  await addTokenCount(token, ctx.from?.id.toString() || "0");
   const url = "https://api.dexscreener.com/latest/dex/tokens/" + token;
   let message = "";
-
+  try {
+    addTokenCount(token, String(ctx.from?.id));
+  } catch (e) {
+    console.log(e);
+  }
   try {
     const response = await fetch(url);
     const data = await response.json();
@@ -39,7 +44,7 @@ export const pfQueryHandler = async (ctx: Context) => {
     // Generate formatted message
     message += `🌜 [${baseToken.name}](${tokenData.url}) (${baseToken.symbol}) - [${priceChange1h}%]\n`;
     message += `💎 FDV: ${fdv} 🕰️ Created at ${createdAt}\n`;
-    message += `💧 Moonshot Progress: ${liquidityUsd}\n`;
+    message += `💧 Liquidity: ${liquidityUsd}\n`;
     message += `Price (USD): $${priceUsd} - Volatility: ${priceChange1h}% (1h)\n\n`;
 
     // Add links to different platforms for further details or actions

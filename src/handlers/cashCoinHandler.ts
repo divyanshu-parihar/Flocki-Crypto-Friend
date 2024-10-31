@@ -1,13 +1,19 @@
-import { Context } from "telegraf";
 import axios from "axios";
+import { Context } from "telegraf";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { escapeMarkdown } from "../utils/escapeMarkdown";
 import { addTokenCount } from "../utils/addTokenCount";
 
-export const compactTokenScanHandler = async (ctx: Context) => {
+const solanaRpcUrl = "https://api.mainnet-beta.solana.com";
+const connection = new Connection(solanaRpcUrl, "confirmed");
+export async function cashCoinHandler(ctx: any) {
+  console.log("here");
   try {
     // Default to a specific token address if none is provided
-    const tokenAddress =
-      ctx.text?.split(" ")[1] || "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+    if (ctx.text.split(" ").length >= 2) {
+      return;
+    }
+    const tokenAddress = ctx.text;
 
     await addTokenCount(tokenAddress, ctx.from?.id.toString() || "0");
     // Dexscreener API endpoint for token info
@@ -15,9 +21,7 @@ export const compactTokenScanHandler = async (ctx: Context) => {
 
     // Fetch data from Dexscreener API
     const response = await axios.get(apiUrl);
-    const data = response.data.pairs.filter(
-      (el: any) => el.dexId === "uniswap"
-    )[0];
+    const data = response.data.pairs[0];
 
     // Check if response data is valid
     // console.log(data)
@@ -65,7 +69,7 @@ export const compactTokenScanHandler = async (ctx: Context) => {
 📊 Vol (24h): \$${volume24h} 🕰️ Age: ${age}d  
 📉 1H Change: ${priceChange1h}% \\⋅ Buys: ${buys24h} / Sells: ${sells24h}  
 🧰 [More on DexScreener](${escapeMarkdown(url)})
-`;
+    `;
 
     // Send the formatted message
     await ctx.reply(message, { parse_mode: "Markdown" });
@@ -73,8 +77,30 @@ export const compactTokenScanHandler = async (ctx: Context) => {
     // Helper function to escape special characters for MarkdownV
   } catch (error) {
     console.error(error);
-    await ctx.reply(
-      "An error occurred while fetching token data. Please try again later."
-    );
+    // await ctx.reply(
+    //   "An error occurred while fetching token data. Please try again later."
+    // );
   }
-};
+}
+
+async function getTokenContractIdFromName(tokenName: string) {
+  const response = await connection.getParsedProgramAccounts(
+    new PublicKey("TokenkegQfeZyiNwAJbNbGzvb6uLTyH1n9z2E9B4v2D2"), // Token Program ID
+    {
+      filters: [
+        {
+          dataSize: 165, // size of token account
+        },
+        {
+          memcmp: {
+            offset: 64, // offset for the token name
+            bytes: tokenName, // token name
+          },
+        },
+      ],
+    }
+  );
+
+  console.log(response);
+  // Return the token contract ID if found
+}

@@ -1,4 +1,5 @@
 import { Context } from "telegraf";
+import { addTokenCount } from "../utils/addTokenCount";
 
 export const msQueryHandler = async (ctx: Context) => {
   const token = ctx.text?.split(" ")[1];
@@ -7,7 +8,7 @@ export const msQueryHandler = async (ctx: Context) => {
     await ctx.reply("Please provide a token symbol to query.");
     return;
   }
-
+  await addTokenCount(token, ctx.from?.id.toString() || "0");
   const url = "https://api.dexscreener.com/latest/dex/tokens/" + token;
   let message = "";
 
