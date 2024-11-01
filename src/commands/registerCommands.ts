@@ -379,5 +379,7 @@ function formatTokenResponse(pair: any) {
     pair.pairCreatedAt
   )}
 📉 1H: ${pair.priceChange?.h1 || 0}% ⋅ $${formatNumber(volume24h) || 0}
+
+${pair.baseToken.address}
 `;
 }
