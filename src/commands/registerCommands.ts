@@ -48,7 +48,6 @@ import { cashCoinHandler } from "../handlers/cashCoinHandler";
 import { cashCointractHandler } from "../handlers/cashContractHandler";
 import { pre } from "telegraf/typings/format";
 import { preHandler } from "../handlers/preHandler";
-import {zap}
 import {
   handleAnon,
   handleAutoResponder,
@@ -165,7 +164,7 @@ export const registerCommands = (bot: Telegraf) => {
         messages: [
           {
             role: "system",
-            content: config.zap_personality,
+            content: config.zap_persoanality,
           },
           {
             role: "user",
@@ -244,7 +243,7 @@ export const registerCommands = (bot: Telegraf) => {
         messages: [
           {
             role: "system",
-            content: config.zap_personality,
+            content: config.zap_persoanality,
           },
           { role: "user", content: userMessage },
         ],
@@ -380,6 +379,7 @@ function formatTokenResponse(pair: any) {
     pair.pairCreatedAt
   )}
 📉 1H: ${pair.priceChange?.h1 || 0}% ⋅ $${formatNumber(volume24h) || 0}
-☠️${pair.baseToken.address}
+
+${pair.baseToken.address}
 `;
 }

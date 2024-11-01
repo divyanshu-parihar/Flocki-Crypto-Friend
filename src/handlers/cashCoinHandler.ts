@@ -5,7 +5,7 @@ import { escapeMarkdown } from "../utils/escapeMarkdown";
 import { addTokenCount } from "../utils/addTokenCount";
 import { openai } from "../commands/registerCommands";
 import profiles from "../profiles";
-import { config } from "../config";
+import config from "../config";
 
 // Regular expressions for Instagram and Twitter/X links
 const INSTAGRAM_PATTERN = /https?:\/\/(?:www\.)?instagram\.com\/[^\s]+/g;
