@@ -3,11 +3,159 @@ import { Context } from "telegraf";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { escapeMarkdown } from "../utils/escapeMarkdown";
 import { addTokenCount } from "../utils/addTokenCount";
+import { openai } from "../commands/registerCommands";
+import profiles from "../profiles";
 
+// Regular expressions for Instagram and Twitter/X links
+const INSTAGRAM_PATTERN = /https?:\/\/(?:www\.)?instagram\.com\/[^\s]+/g;
+const TWITTER_PATTERN = /https?:\/\/(?:www\.)?(twitter\.com|x\.com)\/[^\s]+/g;
+
+// Helper function to find social media links
+function findSocialMediaLinks(text: any) {
+  const links = [];
+  let match;
+
+  // Find Instagram links
+  while ((match = INSTAGRAM_PATTERN.exec(text)) !== null) {
+    links.push(match[0]);
+  }
+
+  // Find Twitter/X links
+  while ((match = TWITTER_PATTERN.exec(text)) !== null) {
+    links.push(match[0]);
+  }
+
+  return links;
+}
+function formatNumber(num: number): string {
+  if (Math.abs(num) >= 1e9) {
+    return (num / 1e9).toFixed(1).replace(/\.0$/, "") + "b";
+  } else if (Math.abs(num) >= 1e6) {
+    return (num / 1e6).toFixed(1).replace(/\.0$/, "") + "m";
+  } else if (Math.abs(num) >= 1e3) {
+    return (num / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
+  } else {
+    return num.toString();
+  }
+}
 const solanaRpcUrl = "https://api.mainnet-beta.solana.com";
 const connection = new Connection(solanaRpcUrl, "confirmed");
+function createFormattedMessage(
+  userName: string,
+  link: string,
+  platform: string
+) {
+  const platformText = platform === "instagram" ? "IG post" : "X post";
+  // Using the 📷 emoji for Instagram and platform-specific formatting
+  return `📷 shared by ${userName}: ${platformText}`;
+}
 export async function cashCoinHandler(ctx: any) {
   console.log("here");
+
+  // changs for the post
+  try {
+    // Check if message contains text
+    if (!ctx.message.text) return;
+
+    // Find social media links in the message
+    const links = findSocialMediaLinks(ctx.message.text);
+
+    if (links.length > 0) {
+      // Get user information
+      const user = ctx.message.from;
+      const userName = user.username
+        ? `@${user.username}`
+        : `${user.first_name}${user.last_name ? ` ${user.last_name}` : ""}`;
+
+      // Delete original message
+      await ctx.deleteMessage();
+
+      // Send new formatted message for each link
+      for (const link of links) {
+        await ctx.replyWithHTML(
+          createFormattedMessage(userName, link, "instagram"),
+          {
+            disable_web_page_preview: false,
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: "🔍 Open",
+                    url: link,
+                  },
+                ],
+              ],
+            },
+          }
+        );
+      }
+    }
+  } catch (error: any) {
+    console.error("Error processing message:", error);
+
+    // If error is about deletion permissions, send warning
+    if (error.description && error.description.includes("delete")) {
+      await ctx.reply("Error: Bot needs admin privileges to delete messages.", {
+        reply_to_message_id: ctx.message.message_id,
+      });
+    }
+  }
+  if (
+    ctx.message.reply_to_message &&
+    ctx.message.reply_to_message.from?.id === ctx.botInfo.id
+  ) {
+    const userMessage = ctx.message.text;
+
+    // let persoanlity = await prisma.currentInteraction.findUnique({
+    //   where: {
+    //     userid: String(ctx.from?.id),
+    //   },
+    // });
+    // if (!persoanlity) {
+    //   return;
+    // }
+    // console.log(
+    //   "persoanlity",
+    //   profiles.profiles[persoanlity?.personality].desc
+    // );
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: `Meet SocialZap—a bot for young, wild crypto enthusiasts who love high-stakes thrills, late nights, and big wins in crypto, stocks, and gambling. SocialZap is edgy, witty, and just professional enough to keep things legit. Imagine a wingman with crypto chops: knows the trends, loves the grind, but isn’t afraid to throw in a meme or two.
+
+Personality:
+
+Tone: Informal, hype, and cheeky. SocialZap sounds like that friend who’s always “in the know” but keeps it real.
+Voice: Excited and daring, with casual lingo and a dash of crypto FOMO.
+Style: Playful risk-taker. It’s like having a friend who’ll both high-five your wins and remind you to “keep it tight!”
+Example Responses:
+
+For risky plays: “Got the guts for this one? Big moves, big gains—or maybe big FOMO!”
+For market buzz: “$BTC looking spicy…you hopping on?”
+For motivation: “Hey, legends aren’t built in a day—but the grind? That’s every day.”
+Use this persona to bring SocialZap to life, balancing degen fun with just enough wisdom to keep things steady.`,
+          },
+          {
+            role: "assistant",
+            content: (ctx.message.reply_to_message as any).text,
+          },
+          { role: "user", content: userMessage },
+        ],
+        max_tokens: 150,
+      });
+
+      const botReply = response.choices[0].message.content;
+      ctx.reply(botReply as string);
+      return;
+    } catch (error) {
+      console.error("Error with OpenAI API:", error);
+      ctx.reply("Sorry, I am having trouble connecting to OpenAI.");
+      return;
+    }
+  }
   try {
     // Default to a specific token address if none is provided
     if (ctx.text.split(" ").length >= 2) {
@@ -46,9 +194,10 @@ export async function cashCoinHandler(ctx: any) {
     const age = Math.floor(
       (Date.now() - data.pairCreatedAt) / (1000 * 60 * 60 * 24)
     ); // Age in days
-    const fdvInBillions = (fdv / 1e9).toFixed(1);
-    const liquidityUsd = liquidity?.usd?.toFixed(1) || "N/A";
-    const volume24h = volume?.h24?.toFixed(1) || "N/A";
+    console.log("fdv", fdv);
+    const fdvInBillions = formatNumber(fdv);
+    const liquidityUsd = formatNumber(liquidity?.usd) || "N/A";
+    const volume24h = formatNumber(volume?.h24) || "N/A";
     const priceChange1h = priceChange?.h1?.toFixed(2) || "0";
     const buys24h = txns?.h24?.buys || 0;
     const sells24h = txns?.h24?.sells || 0;
@@ -63,9 +212,9 @@ export async function cashCoinHandler(ctx: any) {
     )} @ ${escapeMarkdown(
       data.dexId.charAt(0).toUpperCase() + data.dexId.slice(1)
     )}  
-💰 USD: \$${parseFloat(priceUsd).toFixed(2)}  
-💎 FDV: \$${fdvInBillions}B  
-💦 Liq: \$${liquidityUsd}M 🐡 \\[x${liquidity?.base || 0}\\]  
+💰 USD: \$${parseFloat(priceUsd).toFixed(9)}  
+💎 FDV: \$${fdvInBillions} 
+💦 Liq: \$${liquidityUsd} 🐡 \\[x${liquidity?.base || 0}\\]  
 📊 Vol (24h): \$${volume24h} 🕰️ Age: ${age}d  
 📉 1H Change: ${priceChange1h}% \\⋅ Buys: ${buys24h} / Sells: ${sells24h}  
 🧰 [More on DexScreener](${escapeMarkdown(url)})

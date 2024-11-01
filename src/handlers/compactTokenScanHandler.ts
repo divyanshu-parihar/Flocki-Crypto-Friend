@@ -59,9 +59,9 @@ export const compactTokenScanHandler = async (ctx: Context) => {
     )} @ ${escapeMarkdown(
       data.dexId.charAt(0).toUpperCase() + data.dexId.slice(1)
     )}  
-💰 USD: \$${parseFloat(priceUsd).toFixed(2)}  
-💎 FDV: \$${fdvInBillions}B  
-💦 Liq: \$${liquidityUsd}M 🐡 \\[x${liquidity?.base || 0}\\]  
+💰 USD: \$${parseFloat(priceUsd).toFixed(9)}  
+💎 FDV: \$${fdvInBillions} 
+💦 Liq: \$${liquidityUsd} 🐡 \\[x${liquidity?.base || 0}\\]  
 📊 Vol (24h): \$${volume24h} 🕰️ Age: ${age}d  
 📉 1H Change: ${priceChange1h}% \\⋅ Buys: ${buys24h} / Sells: ${sells24h}  
 🧰 [More on DexScreener](${escapeMarkdown(url)})

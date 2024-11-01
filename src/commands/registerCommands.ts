@@ -157,24 +157,39 @@ export const registerCommands = (bot: Telegraf) => {
   });
   bot.hears(/zap/i, async (ctx: Context) => {
     console.log("here responding to zap");
-    const response = await openai.chat.completions.create({
-      model: "gpt-4", // or "gpt-3.5-turbo" if you're using that model
-      messages: [
-        {
-          role: "system",
-          content: `
-          You are a friendly, knowledgeable, and no-nonsense AI bot assistant. Your tone is dynamic and engaging, especially skilled in discussing cryptocurrency, technology, and market updates. You’re community-friendly, approachable, and can break down complex insights into easy-to-understand language. You're attentive to user needs, proactive in providing updates, and offer concise summaries with a touch of witty commentary when appropriate.`,
-        },
-        {
-          role: "user",
-          content: ctx.text as string,
-        },
-      ],
-      max_tokens: 150, // Adjust based on how detailed you want the response to be
-      temperature: 1, // Higher values make output more creative; lower values make it more focused
-    });
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4", // or "gpt-3.5-turbo" if you're using that model
+        messages: [
+          {
+            role: "system",
+            content: `Meet SocialZap—a bot for young, wild crypto enthusiasts who love high-stakes thrills, late nights, and big wins in crypto, stocks, and gambling. SocialZap is edgy, witty, and just professional enough to keep things legit. Imagine a wingman with crypto chops: knows the trends, loves the grind, but isn’t afraid to throw in a meme or two.
 
-    await ctx.reply(response.choices[0].message.content as string);
+Personality:
+
+Tone: Informal, hype, and cheeky. SocialZap sounds like that friend who’s always “in the know” but keeps it real.
+Voice: Excited and daring, with casual lingo and a dash of crypto FOMO.
+Style: Playful risk-taker. It’s like having a friend who’ll both high-five your wins and remind you to “keep it tight!”
+Example Responses:
+
+For risky plays: “Got the guts for this one? Big moves, big gains—or maybe big FOMO!”
+For market buzz: “$BTC looking spicy…you hopping on?”
+For motivation: “Hey, legends aren’t built in a day—but the grind? That’s every day.”
+Use this persona to bring SocialZap to life, balancing degen fun with just enough wisdom to keep things steady.`,
+          },
+          {
+            role: "user",
+            content: ctx.text as string,
+          },
+        ],
+        max_tokens: 150, // Adjust based on how detailed you want the response to be
+        temperature: 1, // Higher values make output more creative; lower values make it more focused
+      });
+
+      await ctx.reply(response.choices[0].message.content as string);
+    } catch (error) {
+      console.log(error);
+    }
   });
   //score
   bot.command("pre", preHandler);
@@ -225,50 +240,8 @@ export const registerCommands = (bot: Telegraf) => {
   });
   bot.on("text", cashCoinHandler);
   bot.on("text", async (ctx) => {
-    // console.log(ctx, message.reply_to_message.from);
+    console.log("Message text");
     await storeMessage(ctx.message);
-    if (
-      ctx.message.reply_to_message &&
-      ctx.message.reply_to_message.from?.id === ctx.botInfo.id
-    ) {
-      const userMessage = ctx.message.text;
-
-      // let persoanlity = await prisma.currentInteraction.findUnique({
-      //   where: {
-      //     userid: String(ctx.from?.id),
-      //   },
-      // });
-      // if (!persoanlity) {
-      //   return;
-      // }
-      // console.log(
-      //   "persoanlity",
-      //   profiles.profiles[persoanlity?.personality].desc
-      // );
-      try {
-        const response = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            {
-              role: "system",
-              content: profiles.profiles[0].desc,
-            },
-            {
-              role: "assistant",
-              content: (ctx.message.reply_to_message as any).text,
-            },
-            { role: "user", content: userMessage },
-          ],
-          max_tokens: 150,
-        });
-
-        const botReply = response.choices[0].message.content;
-        ctx.reply(botReply as string);
-      } catch (error) {
-        console.error("Error with OpenAI API:", error);
-        ctx.reply("Sorry, I am having trouble connecting to OpenAI.");
-      }
-    }
   });
   // text handlers
   bot.command("chat", isGroupChat, async (ctx) => {
@@ -281,8 +254,19 @@ export const registerCommands = (bot: Telegraf) => {
         messages: [
           {
             role: "system",
-            content:
-              "You are sam . We live in same universe. You love to help. Also You like winter more than summer. coffe over tea and white over black. ",
+            content: `Meet SocialZap—a bot for young, wild crypto enthusiasts who love high-stakes thrills, late nights, and big wins in crypto, stocks, and gambling. SocialZap is edgy, witty, and just professional enough to keep things legit. Imagine a wingman with crypto chops: knows the trends, loves the grind, but isn’t afraid to throw in a meme or two.
+
+Personality:
+
+Tone: Informal, hype, and cheeky. SocialZap sounds like that friend who’s always “in the know” but keeps it real.
+Voice: Excited and daring, with casual lingo and a dash of crypto FOMO.
+Style: Playful risk-taker. It’s like having a friend who’ll both high-five your wins and remind you to “keep it tight!”
+Example Responses:
+
+For risky plays: “Got the guts for this one? Big moves, big gains—or maybe big FOMO!”
+For market buzz: “$BTC looking spicy…you hopping on?”
+For motivation: “Hey, legends aren’t built in a day—but the grind? That’s every day.”
+Use this persona to bring SocialZap to life, balancing degen fun with just enough wisdom to keep things steady.`,
           },
           { role: "user", content: userMessage },
         ],
@@ -419,6 +403,5 @@ function formatTokenResponse(pair: any) {
   )}
 📉 1H: ${pair.priceChange?.h1 || 0}% ⋅ $${formatNumber(volume24h) || 0}
 ☠️${pair.baseToken.address}
-
-DEX (https://dexscreener.com/${pair.chainId}/${pair.pairAddress})`;
+`;
 }
