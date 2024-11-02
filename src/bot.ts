@@ -1,5 +1,5 @@
 import { Context, Telegraf } from "telegraf";
-import { config } from "./config";
+import config from "./config";
 import { registerCommands } from "./commands/registerCommands";
 import { PrismaClient } from "@prisma/client";
 import cron from "node-cron";

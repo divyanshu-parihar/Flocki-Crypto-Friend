@@ -1,7 +1,7 @@
 import { Context } from "telegraf";
 import { prisma } from "../bot";
 import { openai } from "../commands/registerCommands";
-import { config } from "../config";
+import config from "../config";
 
 export async function handleAicaCommand(ctx: any) {
   try {

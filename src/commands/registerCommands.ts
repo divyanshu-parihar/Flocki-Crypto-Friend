@@ -146,8 +146,11 @@ export const registerCommands = (bot: Telegraf) => {
   bot.hears(/\$(\w+)/, async (ctx) => {
     const tokenName = ctx.match[1];
     const loadingMsg = await ctx.reply(`Searching for $${tokenName}...`);
-
+    const result = await fetchMexcInfo(ctx);
+    if (result == true) return;
+    console.log("trying the uniswap");
     const tokenInfo = await fetchTokenInfo(tokenName);
+    console.log(tokenInfo);
     const response = formatTokenResponse(tokenInfo);
 
     // Delete loading message and send formatted response
@@ -339,6 +342,53 @@ function getTimeDifference(timestamp: any) {
   );
   if (diffInHours < 24) return `${diffInHours}h`;
   return `${Math.floor(diffInHours / 24)}d`;
+}
+async function fetchMexcInfo(ctx: Context): Promise<boolean> {
+  try {
+    // Set the default token symbol to MXUSDT if no token is provided
+    const token = ctx.text?.slice(1).toUpperCase() + "USDT" || "ETHUSDT";
+
+    // API endpoint for 24-hour ticker
+    const apiUrl = `https://api.mexc.in/api/v3/ticker/24hr?symbol=${token}`;
+
+    // Fetch ticker data from MEXC API
+    const response = await axios.get(apiUrl);
+    const data = response.data;
+
+    // Check if the response data is valid
+    if (!data.symbol) {
+      await ctx.reply(
+        "Token not found. Please check the symbol and try again."
+      );
+      return false;
+    }
+
+    // Parse and format the response data
+    const message = `
+🟡 [View on MEXC](https://www.mexc.com/token/${data.symbol})  
+🌐 ${data.symbol} @ MEXC  
+💰 Last Price: \$${parseFloat(data.lastPrice).toFixed(2)}  
+💎 Price Change: \$${parseFloat(data.priceChange).toFixed(2)} \(${
+      data.priceChangePercent
+    }\%\)  
+💦 High: \$${parseFloat(data.highPrice).toFixed(2)}  
+📉 Low: \$${parseFloat(data.lowPrice).toFixed(2)}  
+📊 Volume: ${parseFloat(data.volume).toFixed(2)} ${data.symbol.replace(
+      /USDT/,
+      ""
+    )}  
+🔹 Bid Price: \$${parseFloat(data.bidPrice).toFixed(2)}  
+🔸 Ask Price: \$${parseFloat(data.askPrice).toFixed(2)}  
+🧰 More: [📊 MEXC](https://www.mexc.com/token/${data.symbol})  
+`;
+
+    await ctx.reply(message, { parse_mode: "Markdown" });
+    return true;
+  } catch (error) {
+    console.error("Error fetching token data:", error);
+    // ctx.reply("Failed to retrieve token information.");
+    return false;
+  }
 }
 
 async function fetchTokenInfo(tokenName: any) {
