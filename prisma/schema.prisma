@@ -109,3 +109,19 @@ model Message {
   isGroup   Boolean  @default(false)
   createdAt DateTime @default(now())
 }
+
+model TokenRequest {
+  id            String   @id @default(cuid())
+  tokenAddress  String
+  userId        String
+  priceUsd      Float
+  fdv           Float?
+  liquidityUsd  Float?
+  volume24h     Float?
+  priceChange1h Float?
+  buys24h       Int?
+  sells24h      Int?
+  createdAt     DateTime @default(now())
+
+  @@index([tokenAddress, userId])
+}

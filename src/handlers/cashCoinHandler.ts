@@ -6,6 +6,7 @@ import { addTokenCount } from "../utils/addTokenCount";
 import { openai } from "../commands/registerCommands";
 import profiles from "../profiles";
 import config from "../config";
+import { prisma } from "../bot";
 
 // Regular expressions for Instagram and Twitter/X links
 const INSTAGRAM_PATTERN = /https?:\/\/(?:www\.)?instagram\.com\/[^\s]+/g;
@@ -150,9 +151,22 @@ export async function cashCoinHandler(ctx: any) {
     if (ctx.text.split(" ").length >= 2) {
       return;
     }
-    const tokenAddress = ctx.text;
 
-    await addTokenCount(tokenAddress, ctx.from?.id.toString() || "0");
+    const tokenAddress = ctx.text;
+    const userId = ctx.from?.id.toString() || "0";
+
+    // Fetch previous request for this token
+    const previousRequest = await prisma.tokenRequest.findFirst({
+      where: {
+        tokenAddress,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    await addTokenCount(tokenAddress, userId);
+
     // Dexscreener API endpoint for token info
     const apiUrl = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`;
 
@@ -161,7 +175,6 @@ export async function cashCoinHandler(ctx: any) {
     const data = response.data.pairs[0];
 
     // Check if response data is valid
-    // console.log(data)
     if (!data) {
       await ctx.reply(
         "Token data not found. Please check the token address and try again."
@@ -169,7 +182,7 @@ export async function cashCoinHandler(ctx: any) {
       return;
     }
 
-    // Parse the relevant fields for the message
+    // Parse the relevant fields
     const {
       baseToken,
       priceUsd,
@@ -180,10 +193,30 @@ export async function cashCoinHandler(ctx: any) {
       txns,
       url,
     } = data;
+
     const age = Math.floor(
       (Date.now() - data.pairCreatedAt) / (1000 * 60 * 60 * 24)
-    ); // Age in days
-    console.log("fdv", fdv);
+    );
+
+    const currentData = {
+      priceUsd: parseFloat(priceUsd),
+      fdv: fdv,
+      liquidityUsd: liquidity?.usd,
+      volume24h: volume?.h24,
+      priceChange1h: priceChange?.h1,
+      buys24h: txns?.h24?.buys || 0,
+      sells24h: txns?.h24?.sells || 0,
+    };
+
+    // Store current request
+    await prisma.tokenRequest.create({
+      data: {
+        tokenAddress,
+        userId,
+        ...currentData,
+      },
+    });
+
     const fdvInBillions = formatNumber(fdv);
     const liquidityUsd = formatNumber(liquidity?.usd) || "N/A";
     const volume24h = formatNumber(volume?.h24) || "N/A";
@@ -191,36 +224,117 @@ export async function cashCoinHandler(ctx: any) {
     const buys24h = txns?.h24?.buys || 0;
     const sells24h = txns?.h24?.sells || 0;
 
-    // Format the message
-    const message = `
+    let message;
+    let previousUserInfo = null;
+    if (previousRequest) {
+      try {
+        previousUserInfo = await ctx.telegram.getChatMember(
+          previousRequest.userId,
+          parseInt(previousRequest.userId)
+        );
+      } catch (error) {
+        console.error("Error fetching user info:", error);
+      }
+    }
+    if (previousRequest) {
+      // Calculate changes
+      const userMention = previousUserInfo?.user?.username
+        ? `@${previousUserInfo.user.username}`
+        : `[${previousUserInfo?.user?.first_name || "User"}](tg://user?id=${
+            previousRequest.userId
+          })`;
+      const priceChange = (
+        ((currentData.priceUsd - previousRequest.priceUsd) /
+          previousRequest.priceUsd) *
+        100
+      ).toFixed(2);
+      const fdvChange = previousRequest.fdv
+        ? (
+            ((currentData.fdv - previousRequest.fdv) / previousRequest.fdv) *
+            100
+          ).toFixed(2)
+        : "N/A";
+      const liqChange = previousRequest.liquidityUsd
+        ? (
+            ((currentData.liquidityUsd - previousRequest.liquidityUsd) /
+              previousRequest.liquidityUsd) *
+            100
+          ).toFixed(2)
+        : "N/A";
+      const volChange = previousRequest.volume24h
+        ? (
+            ((currentData.volume24h - previousRequest.volume24h) /
+              previousRequest.volume24h) *
+            100
+          ).toFixed(2)
+        : "N/A";
+
+      const timeSinceLastRequest = formatTimeAgo(previousRequest.createdAt);
+
+      message = `
 🟡 [${escapeMarkdown(baseToken.name)} (${escapeMarkdown(
-      baseToken.symbol
-    )}) on DexScreener](${escapeMarkdown(url)})  
+        baseToken.symbol
+      )}) on DexScreener](${escapeMarkdown(url)})  
 🌐 ${escapeMarkdown(
-      data.chainId.charAt(0).toUpperCase() + data.chainId.slice(1)
-    )} @ ${escapeMarkdown(
-      data.dexId.charAt(0).toUpperCase() + data.dexId.slice(1)
-    )}  
-💰 USD: \$${parseFloat(priceUsd).toFixed(9)}  
-💎 FDV: \$${fdvInBillions} 
-💦 Liq: \$${liquidityUsd} 🐡 \\[x${liquidity?.base || 0}\\]  
-📊 Vol (24h): \$${volume24h} 🕰️ Age: ${age}d  
-📉 1H Change: ${priceChange1h}% \\⋅ Buys: ${buys24h} / Sells: ${sells24h}  
+        data.chainId.charAt(0).toUpperCase() + data.chainId.slice(1)
+      )} @ ${escapeMarkdown(
+        data.dexId.charAt(0).toUpperCase() + data.dexId.slice(1)
+      )}  
+💰 USD: $${parseFloat(priceUsd).toFixed(9)} (${priceChange}% since last request)
+💎 FDV: $${fdvInBillions} (${fdvChange}%)
+💦 Liq: $${liquidityUsd} (${liqChange}%) 🐡 [x${liquidity?.base || 0}]  
+📊 Vol (24h): $${volume24h} (${volChange}%) 🕰️ Age: ${age}d  
+📉 1H Change: ${priceChange1h}% · Buys: ${buys24h} / Sells: ${sells24h}  
+⏱️ Last requested: ${timeSinceLastRequest} ago by ${userMention}
 🧰 [More on DexScreener](${escapeMarkdown(url)})
-    `;
+      `;
+    } else {
+      message = `
+🟡 [${escapeMarkdown(baseToken.name)} (${escapeMarkdown(
+        baseToken.symbol
+      )}) on DexScreener](${escapeMarkdown(url)})  
+🌐 ${escapeMarkdown(
+        data.chainId.charAt(0).toUpperCase() + data.chainId.slice(1)
+      )} @ ${escapeMarkdown(
+        data.dexId.charAt(0).toUpperCase() + data.dexId.slice(1)
+      )}  
+💰 USD: $${parseFloat(priceUsd).toFixed(9)}  
+💎 FDV: $${fdvInBillions} 
+💦 Liq: $${liquidityUsd} 🐡 [x${liquidity?.base || 0}]  
+📊 Vol (24h): $${volume24h} 🕰️ Age: ${age}d  
+📉 1H Change: ${priceChange1h}% · Buys: ${buys24h} / Sells: ${sells24h}  
+🧰 [More on DexScreener](${escapeMarkdown(url)})
+      `;
+    }
 
-    // Send the formatted message
     await ctx.reply(message, { parse_mode: "Markdown" });
-
-    // Helper function to escape special characters for MarkdownV
   } catch (error) {
     console.error(error);
-    // await ctx.reply(
-    //   "An error occurred while fetching token data. Please try again later."
-    // );
   }
 }
+// Helper function to format time ago
+function formatTimeAgo(date: Date) {
+  const seconds = Math.floor(
+    (new Date().getTime() - new Date(date).getTime()) / 1000
+  );
 
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " years";
+
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " months";
+
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " days";
+
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours";
+
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " minutes";
+
+  return Math.floor(seconds) + " seconds";
+}
 async function getTokenContractIdFromName(tokenName: string) {
   const response = await connection.getParsedProgramAccounts(
     new PublicKey("TokenkegQfeZyiNwAJbNbGzvb6uLTyH1n9z2E9B4v2D2"), // Token Program ID
