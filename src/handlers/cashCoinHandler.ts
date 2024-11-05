@@ -13,18 +13,24 @@ const INSTAGRAM_PATTERN = /https?:\/\/(?:www\.)?instagram\.com\/[^\s]+/g;
 const TWITTER_PATTERN = /https?:\/\/(?:www\.)?(twitter\.com|x\.com)\/[^\s]+/g;
 
 // Helper function to find social media links
-function findSocialMediaLinks(text: any) {
+function findSocialMediaLinks(text: any){
   const links = [];
   let match;
 
   // Find Instagram links
-  while ((match = INSTAGRAM_PATTERN.exec(text)) !== null) {
-    links.push(match[0]);
+  while ((match = INSTAGRAM_PATTERN.exec(text )) !== null) {
+    const originalUrl = match[0];
+    const modifiedUrl = originalUrl.replace('instagram.com', 'ddinstagram.com');
+    links.push({ url: modifiedUrl, type: 'instagram' });
   }
 
   // Find Twitter/X links
   while ((match = TWITTER_PATTERN.exec(text)) !== null) {
-    links.push(match[0]);
+    const originalUrl = match[0];
+    const modifiedUrl = originalUrl
+        .replace('twitter.com', 'fxtwitter.com')
+        .replace('x.com', 'fxtwitter.com');
+    links.push({ url: modifiedUrl, type: 'twitter' });
   }
 
   return links;
@@ -43,13 +49,12 @@ function formatNumber(num: number): string {
 const solanaRpcUrl = "https://api.mainnet-beta.solana.com";
 const connection = new Connection(solanaRpcUrl, "confirmed");
 function createFormattedMessage(
-  userName: string,
-  link: string,
-  platform: string
+    userName: string,
+    link: { url: string, type: string },
 ) {
-  const platformText = platform === "instagram" ? "IG post" : "X post";
-  // Using the 📷 emoji for Instagram and platform-specific formatting
-  return `📷 shared by ${userName}: ${platformText}`;
+  const platformEmoji = link.type === 'instagram' ? '📷' : '🐦';
+  const platformText = link.type === 'instagram' ? 'IG post' : 'X post';
+  return `${platformEmoji} shared by ${userName}: ${platformText}\n\n\u200B${link.url}`;;
 }
 export async function cashCoinHandler(ctx: any) {
   console.log("here");
@@ -75,19 +80,20 @@ export async function cashCoinHandler(ctx: any) {
       // Send new formatted message for each link
       for (const link of links) {
         await ctx.replyWithHTML(
-          createFormattedMessage(userName, link, "instagram"),
+          createFormattedMessage(userName, link),
           {
             disable_web_page_preview: false,
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: "🔍 Open",
-                    url: link,
-                  },
-                ],
-              ],
-            },
+            parse_mode :'HTML'
+            // reply_markup: {
+            //   inline_keyboard: [
+            //     [
+            //       {
+            //         text: "🔍 Open",
+            //         url: link,
+            //       },
+            //     ],
+            //   ],
+            // },
           }
         );
       }
